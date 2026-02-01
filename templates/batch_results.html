@@ -1,4 +1,4 @@
-<!-- templates/batch_results.html - WORKING VERSION -->
+<!-- templates/batch_results.html - UPDATED WITH ADMIN -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,6 +31,9 @@
             background: white;
             padding: 1rem 2rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .nav-links {
@@ -45,11 +48,39 @@
             text-decoration: none;
             color: #0a4a8a;
             font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(30, 144, 255, 0.1);
         }
         
         .nav-links a.active {
             color: #1e90ff;
             border-bottom: 2px solid #1e90ff;
+        }
+        
+        .nav-links a.admin-login {
+            color: #FF9800;
+        }
+        
+        .nav-links a.admin-logout {
+            color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        
+        .admin-badge {
+            background: #4CAF50;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
         }
         
         .container {
@@ -64,6 +95,17 @@
             padding: 2rem;
             border-radius: 15px;
             margin-bottom: 2rem;
+            position: relative;
+        }
+        
+        .batch-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+        
+        .batch-header p {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
         }
         
         .stats-grid {
@@ -132,6 +174,21 @@
             text-decoration: none;
             border-radius: 5px;
             display: inline-block;
+            transition: all 0.3s;
+        }
+        
+        .view-btn:hover {
+            background: #0a4a8a;
+            transform: translateY(-2px);
+        }
+        
+        .has-info-badge {
+            background: #FF9800;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            margin-left: 0.5rem;
         }
         
         .footer {
@@ -185,6 +242,53 @@
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
+        
+        /* Admin specific styles */
+        .admin-notice {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .sensitive-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #FF9800;
+            border-radius: 50%;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        
+        @media (max-width: 768px) {
+            .nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .batch-header h1 {
+                font-size: 2rem;
+            }
+            
+            .students-table {
+                font-size: 0.9rem;
+            }
+            
+            .students-table th,
+            .students-table td {
+                padding: 0.5rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -199,16 +303,39 @@
 
     <!-- Navigation -->
     <nav class="nav">
-        <ul class="nav-links">
-            <li><a href="{{ url_for('home') }}">Home</a></li>
-            <li><a href="{{ url_for('batch_results', batch_year=2022) }}" class="{{ 'active' if batch_year == 2022 }}">2022</a></li>
-            <li><a href="{{ url_for('batch_results', batch_year=2023) }}" class="{{ 'active' if batch_year == 2023 }}">2023</a></li>
-            <li><a href="{{ url_for('batch_results', batch_year=2024) }}" class="{{ 'active' if batch_year == 2024 }}">2024</a></li>
-        </ul>
-    </nav>
+    <ul class="nav-links">
+        <li><a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint == 'home' }}">Home</a></li>
+        <li><a href="{{ url_for('batch_results', batch_year=2022) }}" class="{{ 'active' if batch_year == 2022 }}">2022</a></li>
+        <li><a href="{{ url_for('batch_results', batch_year=2023) }}" class="{{ 'active' if batch_year == 2023 }}">2023</a></li>
+        <li><a href="{{ url_for('batch_results', batch_year=2024) }}" class="{{ 'active' if batch_year == 2024 }}">2024</a></li>
+        
+        <!-- ADD THIS PART -->
+        {% if is_admin %}
+        <li><a href="{{ url_for('admin_logout') }}" style="color: #4CAF50; font-weight: bold;">
+            <i class="fas fa-sign-out-alt"></i> Logout Admin
+        </a></li>
+        {% else %}
+        <li><a href="{{ url_for('admin_login') }}" style="color: #FF9800; font-weight: bold;">
+            <i class="fas fa-user-shield"></i> Admin Login
+        </a></li>
+        {% endif %}
+    </ul>
+</nav>
 
     <!-- Main Content -->
     <main class="container">
+        {% if is_admin %}
+        <div class="admin-notice">
+            <i class="fas fa-user-shield"></i>
+            <div>
+                <strong>Administrator Mode Active</strong>
+                <p style="margin: 0.3rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">
+                    You can view sensitive student information (phone, CNIC, district) when viewing individual results.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+        
         {% if stats.total > 0 %}
         <!-- Batch Header -->
         <div class="batch-header">
@@ -238,6 +365,13 @@
 
         <!-- Students Table -->
         <h2>Student Results ({{ stats.total }})</h2>
+        {% if is_admin %}
+        <p style="color: #666; margin-bottom: 1rem;">
+            <i class="fas fa-info-circle"></i> 
+            Students with <span class="has-info-badge">+INFO</span> have additional contact information available.
+        </p>
+        {% endif %}
+        
         <table class="students-table">
             <thead>
                 <tr>
@@ -252,7 +386,12 @@
                 {% for student in students %}
                 <tr>
                     <td>{{ student.roll_no }}</td>
-                    <td>{{ student.name }}</td>
+                    <td>
+                        {{ student.name }}
+                        {% if (student.phone or student.cnic or student.district) and is_admin %}
+                        <span class="has-info-badge" title="Has contact information">+INFO</span>
+                        {% endif %}
+                    </td>
                     <td>{{ student.fname }}</td>
                     <td>
                         <span class="gpa-badge {% if student.gpa >= 3.5 %}gpa-excellent{% elif student.gpa >= 3.0 %}gpa-good{% elif student.gpa >= 2.0 %}gpa-average{% else %}gpa-poor{% endif %}">
@@ -261,7 +400,7 @@
                     </td>
                     <td>
                         <a href="{{ url_for('search_results') }}?roll_no={{ student.roll_no }}" class="view-btn">
-                            View Result
+                            <i class="fas fa-eye"></i> View Result
                         </a>
                     </td>
                 </tr>
@@ -280,6 +419,11 @@
                         <div>
                             <strong>{{ student.name }}</strong>
                             <div style="font-size: 0.9rem; color: #666;">{{ student.roll_no }}</div>
+                            {% if (student.phone or student.cnic or student.district) and is_admin %}
+                            <div style="font-size: 0.8rem; color: #FF9800; margin-top: 0.2rem;">
+                                <i class="fas fa-user-circle"></i> Has contact info
+                            </div>
+                            {% endif %}
                         </div>
                         <div style="margin-left: auto; text-align: right;">
                             <div style="font-size: 1.5rem; font-weight: bold; color: #0a4a8a;">
@@ -309,6 +453,46 @@
     <footer class="footer">
         <p>Quaid-e-Awam University of Engineering, Science & Technology</p>
         <p>Department of Software Engineering © 2024</p>
+        {% if is_admin %}
+        <p style="margin-top: 1rem; color: #4CAF50;">
+            <i class="fas fa-user-shield"></i> Viewing in Administrator Mode
+        </p>
+        {% endif %}
     </footer>
+
+    <!-- Font Awesome for icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    
+    <script>
+        // Add hover effect to table rows
+        document.addEventListener('DOMContentLoaded', function() {
+            const tableRows = document.querySelectorAll('.students-table tbody tr');
+            
+            tableRows.forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px)';
+                    this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                    this.style.transition = 'all 0.3s ease';
+                });
+                
+                row.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+            
+            // Add click effect to view buttons
+            const viewButtons = document.querySelectorAll('.view-btn');
+            viewButtons.forEach(btn => {
+                btn.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px) scale(1.05)';
+                });
+                
+                btn.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+        });
+    </script>
 </body>
 </html>

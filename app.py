@@ -1,42 +1,86 @@
-# app.py - FIXED VERSION
-from flask import Flask, render_template, request, redirect, url_for, flash
+# app.py - COMPLETE VERSION WITH ADMIN FEATURES
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import mysql.connector
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'quest-university-project-2024'
+app.secret_key = 'quest-university-project-2024-secret-key-admin'
+
+# Database configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'dreamteam',
+    'database': 'quest_result_system',
+    'auth_plugin': 'mysql_native_password'
+}
 
 def get_db_connection():
     """Connect to MySQL database"""
     try:
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='dreamteam',
-            database='quest_result_system',
-            auth_plugin='mysql_native_password'
-        )
+        conn = mysql.connector.connect(**DB_CONFIG)
         return conn
     except mysql.connector.Error as err:
         print(f"✗ Database Error: {err}")
-        flash(f'Database connection failed: {err}', 'error')
+        flash('Database connection failed. Please try again later.', 'error')
         return None
-    except Exception as e:
-        print(f"✗ General Error: {e}")
-        flash('Database connection failed', 'error')
-        return None
+
+# ============ ADMIN FUNCTIONS ============
+def is_admin_logged_in():
+    """Check if admin is logged in - SIMPLE VERSION"""
+    return session.get('admin_logged_in') == True
+
+# ============ ROUTES ============
 
 # Homepage
 @app.route('/')
 def home():
-    return render_template('index.html')
-
-# Search results - SIMPLIFIED WORKING VERSION
-@app.route('/search', methods=['POST'])
-def search_results():
-    roll_no = request.form.get('roll_no', '').strip().upper()
+    return render_template('index.html', is_admin=is_admin_logged_in())
+# Admin Login
+# Admin Login - ULTRA SIMPLE VERSION
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    # If already logged in, redirect to home
+    if session.get('admin_logged_in'):
+        flash('Already logged in as admin!', 'info')
+        return redirect(url_for('home'))
     
-    print(f"🔍 Searching for: {roll_no}")  # Debug
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        print(f"🔐 DEBUG: Login attempt - Username: {username}, Password: {password}")
+        
+        # ULTRA SIMPLE - Hardcoded credentials
+        if username == "admin" and password == "quest1234":
+            session['admin_logged_in'] = True
+            session['admin_username'] = username
+            print("✅ DEBUG: Login SUCCESS - Setting session")
+            flash('🎉 Admin login successful!', 'success')
+            return redirect(url_for('home'))
+        else:
+            print(f"❌ DEBUG: Login FAILED - Expected: admin/quest1234, Got: {username}/{password}")
+            flash('❌ Invalid credentials. Use: admin / quest1234', 'error')
+    
+    return render_template('admin_login.html')
+# Admin Logout
+@app.route('/admin/logout')
+def admin_logout():
+    session.clear()
+    flash('Admin logged out successfully', 'success')
+    return redirect(url_for('home'))
+
+@app.route('/search', methods=['GET', 'POST'])
+def search_results():
+    # Handle both GET (from batch page links) and POST (from search form)
+    if request.method == 'POST':
+        roll_no = request.form.get('roll_no', '').strip().upper()
+    else:
+        roll_no = request.args.get('roll_no', '').strip().upper()
+    
+    print(f"🔍 Searching for: {roll_no}")
+    print(f"🔐 Admin status: {is_admin_logged_in()}")
     
     if not roll_no:
         flash('Please enter a roll number', 'error')
@@ -49,10 +93,8 @@ def search_results():
     cursor = conn.cursor(dictionary=True)
     
     try:
-        print(f"📊 Executing query...")  # Debug
         cursor.execute("SELECT * FROM students WHERE roll_no = %s", (roll_no,))
         student = cursor.fetchone()
-        print(f"📊 Query result: {student}")  # Debug
         
         if student:
             # Convert decimal to float
@@ -68,27 +110,35 @@ def search_results():
             cursor.close()
             conn.close()
             
-            print(f"✅ Found student: {student['name']}")  # Debug
-            return render_template('results.html', student=student)
+            # Debug print
+            print(f"✅ Found student: {student['roll_no']}")
+            print(f"📞 Student has phone: {student.get('phone')}")
+            print(f"🆔 Student has CNIC: {student.get('cnic')}")
+            print(f"📍 Student has district: {student.get('district')}")
+            print(f"👑 Admin logged in: {is_admin_logged_in()}")
+            
+            # PASS is_admin TO THE TEMPLATE
+            is_admin = is_admin_logged_in()
+            
+            return render_template('results.html', 
+                                 student=student, 
+                                 is_admin=is_admin,
+                                 has_sensitive_info=bool(student.get('phone') or student.get('cnic') or student.get('district')))
         else:
             cursor.close()
             conn.close()
-            print(f"❌ Student not found: {roll_no}")  # Debug
             flash(f'Student not found: {roll_no}', 'error')
             return redirect(url_for('home'))
             
     except Exception as e:
-        print(f"❌ SEARCH ERROR: {str(e)}")  # Debug
+        print(f"❌ SEARCH ERROR: {str(e)}")
         cursor.close()
         conn.close()
         flash(f'Error: {str(e)}', 'error')
         return redirect(url_for('home'))
-
-# Batch results - SIMPLIFIED
+# Batch results
 @app.route('/batch/<int:batch_year>')
 def batch_results(batch_year):
-    print(f"📊 Loading batch: {batch_year}")  # Debug
-    
     conn = get_db_connection()
     if not conn:
         flash('Database connection failed', 'error')
@@ -100,7 +150,6 @@ def batch_results(batch_year):
         # Get students
         cursor.execute("SELECT * FROM students WHERE batch_year = %s ORDER BY roll_no", (batch_year,))
         students = cursor.fetchall()
-        print(f"📊 Found {len(students)} students")  # Debug
         
         # Get statistics
         cursor.execute("""
@@ -113,7 +162,6 @@ def batch_results(batch_year):
         """, (batch_year,))
         
         stats = cursor.fetchone()
-        print(f"📊 Stats: {stats}")  # Debug
         
         # Convert decimal to float
         for student in students:
@@ -129,10 +177,11 @@ def batch_results(batch_year):
         return render_template('batch_results.html', 
                              students=students, 
                              stats=stats,
-                             batch_year=batch_year)
+                             batch_year=batch_year,
+                             is_admin=is_admin_logged_in())
         
     except Exception as e:
-        print(f"❌ BATCH ERROR: {str(e)}")  # Debug
+        print(f"❌ BATCH ERROR: {str(e)}")
         if cursor:
             cursor.close()
         if conn:
@@ -140,7 +189,7 @@ def batch_results(batch_year):
         flash(f'Error: {str(e)}', 'error')
         return redirect(url_for('home'))
 
-# Test route to check database
+# Test route
 @app.route('/test/db')
 def test_db():
     conn = get_db_connection()
@@ -150,30 +199,50 @@ def test_db():
     cursor = conn.cursor(dictionary=True)
     
     try:
-        # Test query
         cursor.execute("SELECT 'SUCCESS' as status, DATABASE() as db, USER() as user")
         result = cursor.fetchone()
         
-        # Count students
         cursor.execute("SELECT COUNT(*) as count FROM students")
         count = cursor.fetchone()
         
-        # Try a specific student
-        cursor.execute("SELECT * FROM students WHERE roll_no = '22SW01'")
-        student = cursor.fetchone()
+        cursor.execute("SELECT roll_no, name, phone, cnic, district FROM students WHERE roll_no IN ('24SW20', '24SW22', '24SW23', '24SW24', '24SW25')")
+        students_with_info = cursor.fetchall()
         
         cursor.close()
         conn.close()
         
-        return f"""
+        html = f"""
         <h1>Database Test</h1>
         <p><b>Status:</b> {result['status']}</p>
         <p><b>Database:</b> {result['db']}</p>
         <p><b>User:</b> {result['user']}</p>
         <p><b>Total Students:</b> {count['count']}</p>
-        <p><b>Test Student (22SW01):</b> {student['name'] if student else 'Not found'}</p>
-        <p><a href="/">Back to Home</a></p>
+        
+        <h2>Students with Sensitive Info:</h2>
+        <table border="1" cellpadding="5">
+            <tr>
+                <th>Roll No</th><th>Name</th><th>Phone</th><th>CNIC</th><th>District</th>
+            </tr>
         """
+        
+        for student in students_with_info:
+            html += f"""
+            <tr>
+                <td>{student['roll_no']}</td>
+                <td>{student['name']}</td>
+                <td>{student['phone'] or 'N/A'}</td>
+                <td>{student['cnic'] or 'N/A'}</td>
+                <td>{student['district'] or 'N/A'}</td>
+            </tr>
+            """
+        
+        html += """
+        </table>
+        <p><a href="/">Back to Home</a></p>
+        <p><a href="/admin/login">Admin Login</a></p>
+        """
+        
+        return html
         
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>"
@@ -184,7 +253,18 @@ if __name__ == '__main__':
     print("="*60)
     print("Starting server...")
     print("Homepage: http://localhost:5000")
+    print("Admin Login: http://localhost:5000/admin/login")
     print("Test DB: http://localhost:5000/test/db")
     print("="*60 + "\n")
     
     app.run(debug=True, port=5000)
+@app.route('/debug/session')
+def debug_session():
+    return f"""
+    <h1>Session Debug</h1>
+    <pre>Session Data: {dict(session)}</pre>
+    <p>is_admin_logged_in(): {is_admin_logged_in()}</p>
+    <p><a href="/admin/login">Go to Login</a></p>
+    <p><a href="/admin/logout">Logout</a></p>
+    <p><a href="/">Home</a></p>
+    """
